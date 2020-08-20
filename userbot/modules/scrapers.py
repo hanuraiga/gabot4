@@ -9,46 +9,39 @@ import os
 import time
 import asyncio
 import shutil
+import json
 from bs4 import BeautifulSoup
 import re
 from time import sleep
-from html import unescape
 from re import findall
-from selenium import webdriver
 from urllib.parse import quote_plus
 from urllib.error import HTTPError
-from selenium.webdriver.support.ui import Select
-from selenium.webdriver.chrome.options import Options
 from wikipedia import summary
 from wikipedia.exceptions import DisambiguationError, PageError
 from urbandict import define
 from requests import get
 from search_engine_parser import GoogleSearch
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 from googletrans import LANGUAGES, Translator
 from gtts import gTTS
 from gtts.lang import tts_langs
 from emoji import get_emoji_regexp
+from youtube_search import YoutubeSearch
 from youtube_dl import YoutubeDL
 from youtube_dl.utils import (DownloadError, ContentTooShortError,
                               ExtractorError, GeoRestrictedError,
                               MaxDownloadsReached, PostProcessingError,
                               UnavailableVideoError, XAttrMetadataError)
 from asyncio import sleep
-from userbot import bot, CMD_HELP, BOTLOG, BOTLOG_CHATID, YOUTUBE_API_KEY, CHROME_DRIVER, GOOGLE_CHROME_BIN
+from userbot import (CMD_HELP, BOTLOG,
+                     BOTLOG_CHATID, WOLFRAM_ID)
 from userbot.events import register
-from telethon import events
 from telethon.tl.types import DocumentAttributeAudio
-from telethon.errors.rpcerrorlist import YouBlockedUserError
-from telethon.tl.functions.account import UpdateNotifySettingsRequest
-from userbot.utils import progress, humanbytes, time_formatter
-from userbot.utils.google_images_download import googleimagesdownload
+from userbot.utils import googleimagesdownload, progress, chrome
 
 CARBONLANG = "auto"
 TTS_LANG = "en"
 TRT_LANG = "en"
-TEMP_DOWNLOAD_DIRECTORY = "/root/One4uBot/.bin"
+TEMP_DOWNLOAD_DIRECTORY = "/One4uBot/.bin"
 
 
 @register(outgoing=True, pattern="^.crblang (.*)")
@@ -71,44 +64,23 @@ async def carbon_api(e):
     elif textx:
         pcode = str(textx.message)  # Importing message to module
     code = quote_plus(pcode)  # Converting to urlencoded
-    await e.edit("`Processing..\n25%`")
-    if os.path.isfile("/root/userbot/.bin/carbon.png"):
-        os.remove("/root/userbot/.bin/carbon.png")
+    await e.edit("`Processing...\n25%`")
+    file_path = TEMP_DOWNLOAD_DIRECTORY + "carbon.png"
+    if os.path.isfile(file_path):
+        os.remove(file_path)
     url = CARBON.format(code=code, lang=CARBONLANG)
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.binary_location = GOOGLE_CHROME_BIN
-    chrome_options.add_argument("--window-size=1920x1080")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-gpu")
-    prefs = {'download.default_directory': '/root/userbot/.bin'}
-    chrome_options.add_experimental_option('prefs', prefs)
-    driver = webdriver.Chrome(executable_path=CHROME_DRIVER,
-                              options=chrome_options)
+    driver = await chrome()
     driver.get(url)
-    await e.edit("`Processing..\n50%`")
-    download_path = '/root/userbot/.bin'
-    driver.command_executor._commands["send_command"] = (
-        "POST", '/session/$sessionId/chromium/send_command')
-    params = {
-        'cmd': 'Page.setDownloadBehavior',
-        'params': {
-            'behavior': 'allow',
-            'downloadPath': download_path
-        }
-    }
-    command_result = driver.execute("send_command", params)
-    driver.find_element_by_xpath("//button[contains(text(),'Export')]").click()
-   # driver.find_element_by_xpath("//button[contains(text(),'4x')]").click()
-   # driver.find_element_by_xpath("//button[contains(text(),'PNG')]").click()
-    await e.edit("`Processing..\n75%`")
+    await e.edit("`Processing...\n50%`")
+    driver.find_element_by_xpath("//button[@id='export-menu']").click()
+    driver.find_element_by_xpath("//button[contains(text(),'4x')]").click()
+    driver.find_element_by_xpath("//button[contains(text(),'PNG')]").click()
+    await e.edit("`Processing...\n75%`")
     # Waiting for downloading
-    while not os.path.isfile("/root/userbot/.bin/carbon.png"):
+    while not os.path.isfile(file_path):
         await sleep(0.5)
-    await e.edit("`Processing..\n100%`")
-    file = '/root/userbot/.bin/carbon.png'
-    await e.edit("`Uploading..`")
+    await e.edit("`Processing...\n100%`")
+    await e.edit("`Uploading...`")
     await e.client.send_file(
         e.chat_id,
         file,
@@ -118,7 +90,7 @@ async def carbon_api(e):
         reply_to=e.message.reply_to_msg_id,
     )
 
-    os.remove('/root/userbot/.bin/carbon.png')
+    os.remove(file_path)
     driver.quit()
     # Removing carbon.png after uploading
     await e.delete()  # Deleting msg
@@ -135,7 +107,7 @@ async def img_sampler(event):
         lim = lim.replace("lim=", "")
         query = query.replace("lim=" + lim[0], "")
     except IndexError:
-        lim = 7
+        lim = 8
     response = googleimagesdownload()
 
     # creating list of arguments
@@ -343,7 +315,7 @@ async def imdb(e):
         final_name = '+'.join(remove_space)
         page = get("https://www.imdb.com/find?ref_=nv_sr_fn&q=" + final_name +
                    "&s=all")
-        lnk = str(page.status_code)
+        str(page.status_code)
         soup = BeautifulSoup(page.content, 'lxml')
         odds = soup.findAll("tr", "odd")
         mov_title = odds[0].findNext('td').findNext('td').text
@@ -485,67 +457,45 @@ async def lang(value):
             f"`Language for {scraper} changed to {LANG.title()}.`")
 
 
-@register(outgoing=True, pattern="^.yt (.*)")
+@register(outgoing=True, pattern=r"^\.yt (\d*) *(.*)")
 async def yt_search(video_q):
-    """ For .yt command, do a YouTube search from Telegram. """
-    query = video_q.pattern_match.group(1)
-    result = ''
+    """For .yt command, do a YouTube search from Telegram."""
+    if video_q.pattern_match.group(1) != "":
+        counter = int(video_q.pattern_match.group(1))
+        if counter > 10:
+            counter = int(10)
+        if counter <= 0:
+            counter = int(1)
+    else:
+        counter = int(5)
 
-    if not YOUTUBE_API_KEY:
-        await video_q.edit(
-            "`Error: YouTube API key missing! Add it to environment vars or config.env.`"
-        )
-        return
+    query = video_q.pattern_match.group(2)
+    if not query:
+        await video_q.edit("`Enter query to search`")
+    await video_q.edit("`Processing...`")
 
-    await video_q.edit("```Processing...```")
-
-    full_response = await youtube_search(query)
-    videos_json = full_response[1]
-
-    for video in videos_json:
-        title = f"{unescape(video['snippet']['title'])}"
-        link = f"https://youtu.be/{video['id']['videoId']}"
-        result += f"{title}\n{link}\n\n"
-
-    reply_text = f"**Search Query:**\n`{query}`\n\n**Results:**\n\n{result}"
-
-    await video_q.edit(reply_text)
-
-
-async def youtube_search(query,
-                         order="relevance",
-                         token=None,
-                         location=None,
-                         location_radius=None):
-    """ Do a YouTube search. """
-    youtube = build('youtube',
-                    'v3',
-                    developerKey=YOUTUBE_API_KEY,
-                    cache_discovery=False)
-    search_response = youtube.search().list(
-        q=query,
-        type="video",
-        pageToken=token,
-        order=order,
-        part="id,snippet",
-        maxResults=10,
-        location=location,
-        locationRadius=location_radius).execute()
-
-    videos = []
-
-    for search_result in search_response.get("items", []):
-        if search_result["id"]["kind"] == "youtube#video":
-            videos.append(search_result)
     try:
-        nexttok = search_response["nextPageToken"]
-        return (nexttok, videos)
-    except HttpError:
-        nexttok = "last_page"
-        return (nexttok, videos)
+        results = json.loads(
+            YoutubeSearch(
+                query,
+                max_results=counter).to_json())
     except KeyError:
-        nexttok = "KeyError, try again."
-        return (nexttok, videos)
+        return await video_q.edit("`Youtube Search gone retard.\nCan't search this query!`")
+
+    output = f"**Search Query:**\n`{query}`\n\n**Results:**\n\n"
+
+    for i in results["videos"]:
+        try:
+            title = i["title"]
+            link = "https://youtube.com" + i["url_suffix"]
+            channel = i["channel"]
+            duration = i["duration"]
+            views = i["views"]
+            output += f"[{title}]({link})\nChannel: `{channel}`\nDuration: {duration} | {views}\n\n"
+        except IndexError:
+            break
+
+    await video_q.edit(output, link_preview=False)
 
 
 @register(outgoing=True, pattern=r".rip(audio|video) (.*)")
@@ -675,94 +625,28 @@ async def download_video(v_url):
         await v_url.delete()
 
 
-@register(outgoing=True, pattern="^.netease(?: |$)(.*)")
-async def WooMai(netase):
-    if netase.fwd_from:
-        return
-    song = netase.pattern_match.group(1)
-    chat = "@WooMaiBot"
-    link = f"/netease {song}"
-    await netase.edit("```Getting Your Music```")
-    async with bot.conversation(chat) as conv:
-          await asyncio.sleep(2)
-          await netase.edit("`Downloading...Please wait`")
-          try:
-              msg = await conv.send_message(link)
-              response = await conv.get_response()
-              respond = await conv.get_response()
-              """ - don't spam notif - """
-              await bot.send_read_acknowledge(conv.chat_id)
-          except YouBlockedUserError:
-              await netase.reply("```Please unblock @WooMaiBot and try again```")
-              return
-          await netase.edit("`Sending Your Music...`")
-          await asyncio.sleep(3)
-          await bot.send_file(netase.chat_id, respond)
-    await netase.client.delete_messages(conv.chat_id,
-                                       [msg.id, response.id, respond.id])
-    await netase.delete()
-
-
-@register(outgoing=True, pattern="^.sdd(?: |$)(.*)")
-async def DeezLoader(Deezlod):
-    if Deezlod.fwd_from:
-        return
-    d_link = Deezlod.pattern_match.group(1)
-    if ".com" not in d_link:
-        await Deezlod.edit("` I need a link to download something pro.`**(._.)**")
-    else:
-        await Deezlod.edit("**Initiating Download!**")
-    chat = "@DeezLoadBot"
-    async with bot.conversation(chat) as conv:
-          try:
-              msg_start = await conv.send_message("/start")
-              response = await conv.get_response()
-              r = await conv.get_response()
-              msg = await conv.send_message(d_link)
-              details = await conv.get_response()
-              song = await conv.get_response()
-              """ - don't spam notif - """
-              await bot.send_read_acknowledge(conv.chat_id)
-          except YouBlockedUserError:
-              await Deezlod.edit("**Error:** `unblock` @DeezLoadBot `and retry!`")
-              return
-          await bot.send_file(Deezlod.chat_id, song, caption=details.text)
-          await Deezlod.client.delete_messages(conv.chat_id,
-                                             [msg_start.id, response.id, r.id, msg.id, details.id, song.id])
-          await Deezlod.delete()
-
-
-@register(outgoing=True, pattern="^.smd(?: |$)(.*)")
-async def SpoMusDown(TifyDown):
-    if TifyDown.fwd_from:
-        return
-    link = TifyDown.pattern_match.group(1)
-    chat = "@SpotifyMusicDownloaderBot"
-    await TifyDown.edit("```Getting Your Music```")
-    async with bot.conversation(chat) as conv:
-          await asyncio.sleep(2)
-          await TifyDown.edit("`Downloading music taking some times,  Stay Tuned.....`")
-          try:
-              response = conv.wait_event(events.NewMessage(incoming=True,from_users=752979930))
-              msg = await bot.send_message(chat, link)
-              respond = await response
-              res = conv.wait_event(events.NewMessage(incoming=True,from_users=752979930))
-              r = await res
-              """ - don't spam notif - """
-              await bot.send_read_acknowledge(conv.chat_id)
-          except YouBlockedUserError:
-              await TifyDown.reply("```Please unblock @SpotifyMusicDownloaderBot and try again```")
-              return
-          await bot.forward_messages(TifyDown.chat_id, respond.message)
-    await TifyDown.client.delete_messages(conv.chat_id,
-                                       [msg.id, r.id, respond.id])
-    await TifyDown.delete()
-
-
 def deEmojify(inputString):
     """ Remove emojis and other non-safe characters from string """
     return get_emoji_regexp().sub(u'', inputString)
 
+
+@register(outgoing=True, pattern=r'^.wolfram (.*)')
+async def wolfram(wvent):
+    """ Wolfram Alpha API """
+    if WOLFRAM_ID is None:
+        await wvent.edit(
+            'Please set your WOLFRAM_ID first !\n'
+            'Get your API KEY from [here](https://'
+            'products.wolframalpha.com/api/)',
+            parse_mode='Markdown')
+        return
+    i = wvent.pattern_match.group(1)
+    appid = WOLFRAM_ID
+    server = f'https://api.wolframalpha.com/v1/spoken?appid={appid}&i={i}'
+    res = get(server)
+    await wvent.edit(f'**{i}**\n\n' + res.text, parse_mode='Markdown')
+    if BOTLOG:
+        await wvent.client.send_message(BOTLOG_CHATID, f'.wolfram {i} was executed successfully')
 
 CMD_HELP.update({
     'img':
@@ -798,8 +682,9 @@ CMD_HELP.update({
     '.trt <text> [or reply]\
         \nUsage: Translates text to the language which is set.\nUse .lang trt <language code> to set language for trt. (Default is English)'
 })
-CMD_HELP.update({'yt': '.yt <text>\
-        \nUsage: Does a YouTube search.'})
+CMD_HELP.update({'yt': '.yt <count> <query>'
+                 '\nUsage: Does a YouTube search.'
+                 '\nCan specify the number of results needed (default is 5).'})
 CMD_HELP.update(
     {"imdb": ".imdb <movie-name>\nShows movie info and other stuff."})
 CMD_HELP.update({
@@ -808,11 +693,7 @@ CMD_HELP.update({
         \nUsage: Download videos and songs from YouTube (and [many other sites](https://ytdl-org.github.io/youtube-dl/supportedsites.html)).'
 })
 CMD_HELP.update({
-    "getmusic":
-    ".netease <Artist - Song Title>\
-    \nUsage: Download music with @WooMaiBot\
-    \n\n.sdd <Spotify/Deezer Link>\
-    \nUsage: Download music from Spotify or Deezer\
-    \n\n.smd <Artist - Song Title>\
-    \nUsage: Download music from Spotify"
+    'wolfram':
+    '.wolfram <query>\
+        \nUsage: Get answers to questions using WolframAlpha Spoken Results API.'
 })

@@ -82,16 +82,17 @@ async def ANTI_SPAMBOTS(welcm):
                     ##############################################
 
                     try:
-                        cas_url = f"https://api.cas.chat/check?user_id={check_user.id}" # https://t.me/combotnews/283
+                        # https://t.me/combotnews/283
+                        cas_url = f"https://api.cas.chat/check?user_id={check_user.id}"
                         r = get(cas_url, timeout=3)
                         data = r.json()
                     except BaseException:
-                        print("CAS check failed, falling back to legacy anti_spambot behaviour.")
+                        print(
+                            "CAS check failed, falling back to legacy anti_spambot behaviour.")
                         data = None
-                        pass
 
                     if data and data['ok']:
-                        reason = f"[Banned by Combot Anti Spam](https://combot.org/cas/query?u={check_user.id})"
+                        reason = f"[Banned by Combot Anti Spam](https://cas.chat/query?u={check_user.id})"
                         spambot = True
                     elif "t.cn/" in message.text:
                         reason = "Match on `t.cn` URLs"

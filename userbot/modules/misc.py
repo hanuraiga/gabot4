@@ -10,10 +10,8 @@ from random import randint
 from time import sleep
 from os import execl
 import sys
-import os
 import io
 import sys
-import json
 from userbot import BOTLOG, BOTLOG_CHATID, CMD_HELP, bot
 from userbot.events import register
 from userbot.utils import time_formatter
@@ -49,21 +47,21 @@ async def sleepybot(time):
 
 
 @register(outgoing=True, pattern="^.shutdown$")
-async def killdabot(event):
-    """ For .shutdown command, shut the bot down."""
-    await event.edit("`Goodbye *Windows XP shutdown sound*....`")
+async def killbot(shut):
+    """For .shutdown command, shut the bot down."""
+    await shut.edit("`Goodbye *Windows XP shutdown sound*....`")
     if BOTLOG:
-        await event.client.send_message(BOTLOG_CHATID, "#SHUTDOWN \n"
-                                        "Bot shut down")
+        await shut.client.send_message(BOTLOG_CHATID, "#SHUTDOWN \n"
+                                       "Bot shut down")
     await bot.disconnect()
 
 
 @register(outgoing=True, pattern="^.restart$")
-async def killdabot(event):
-    await event.edit("`*i would be back in a moment*`")
+async def killdabot(reboot):
+    await reboot.edit("`*i would be back in a moment*`")
     if BOTLOG:
-        await event.client.send_message(BOTLOG_CHATID, "#RESTART \n"
-                                        "Bot Restarted")
+        await reboot.client.send_message(BOTLOG_CHATID, "#RESTART \n"
+                                         "Bot Restarted")
     await bot.disconnect()
     # Spin a new instance of bot
     execl(sys.executable, sys.executable, *sys.argv)
@@ -71,34 +69,9 @@ async def killdabot(event):
     exit()
 
 
-@register(outgoing=True, pattern="^.community$")
-async def bot_community(community):
-    """ For .community command, just returns OG Paperplane's group link. """
-    await community.edit(
-        "Join RaphielGang's awesome userbot community: @tgpaperplane"
-        "\nDo note that Paperplane Extended is an unoficial fork of their "
-        "Paperplane project and it may get limited or no support for bugs.")
-
-
-@register(outgoing=True, pattern="^.support$")
-async def bot_support(wannahelp):
-    """ For .support command, just returns the group link. """
-    await wannahelp.edit(
-        "Join Our UserbotIndo Channel: @userbotindocloud \
-        \nJoin Userbot Indo Support Group: @userbotindo")
-
-
-@register(outgoing=True, pattern="^.creator$")
-async def creator(ereee):
-    """ See who create this userbot. """
-    await ereee.edit(
-        "Creator of this userbot:"
-        "\n• 💘 [MoveAngel](https://github.com/MoveAngel) 💘")
-
-
 @register(outgoing=True, pattern="^.readme$")
-async def reedme(e):
-    await e.edit(
+async def reedme(event):
+    await event.edit(
         "Here's something for you to read:\n"
         "\n[One4uBot's README.md file](https://github.com/MoveAngel/One4uBot/blob/sql-extended/README.md)"
         "\n[Setup Guide - Basic](https://telegra.ph/How-to-host-a-Telegram-Userbot-07-01-2)"
@@ -106,8 +79,8 @@ async def reedme(e):
         "\n[Setup Guide - LastFM Module](https://telegra.ph/How-to-set-up-LastFM-module-for-Paperplane-userbot-11-02)"
         "\n[Setup Guide - From MiHub with Pict](https://www.mihub.my.id/2020/05/jadiuserbot.html)"
         "\n[Setup Guide - In Indonesian Language](https://telegra.ph/UserIndoBot-05-21-3)"
-        "\n[Instant Setup - Generate String Session](https://One4uBot.moveangel.repl.run)")
-    
+        "\n[Instant Setup - Generate String Session](https://userbotsession.moveangel.repl.run)")
+
 
 # Copyright (c) Gegham Zakaryan | 2019
 @register(outgoing=True, pattern="^.repeat (.*)")
@@ -133,21 +106,21 @@ async def repo_is_here(wannasee):
 
 
 @register(outgoing=True, pattern="^.raw$")
-async def raw(event):
+async def raw(rawtext):
     the_real_message = None
     reply_to_id = None
-    if event.reply_to_msg_id:
-        previous_message = await event.get_reply_message()
+    if rawtext.reply_to_msg_id:
+        previous_message = await rawtext.get_reply_message()
         the_real_message = previous_message.stringify()
-        reply_to_id = event.reply_to_msg_id
+        reply_to_id = rawtext.reply_to_msg_id
     else:
-        the_real_message = event.stringify()
-        reply_to_id = event.message.id
+        the_real_message = rawtext.stringify()
+        reply_to_id = rawtext.message.id
     with io.BytesIO(str.encode(the_real_message)) as out_file:
         out_file.name = "raw_message_data.txt"
-        await event.edit(
+        await rawtext.edit(
             "`Check the userbot log for the decoded message data !!`")
-        await event.client.send_file(
+        await rawtext.client.send_file(
             BOTLOG_CHATID,
             out_file,
             force_document=True,
@@ -175,16 +148,6 @@ CMD_HELP.update({
 hear Windows XP shutdown sound... but you don't."
 })
 
-CMD_HELP.update(
-    {'support': ".support\
-\nUsage: If you need help, use this command."})
-
-CMD_HELP.update({
-    'community':
-    ".community\
-\nUsage: Join the awesome Paperplane userbot community !!"
-})
-
 CMD_HELP.update({
     'repo':
     '.repo\
@@ -196,10 +159,6 @@ CMD_HELP.update({
     ".readme\
 \nUsage: Provide links to setup the userbot and it's modules."
 })
-
-CMD_HELP.update(
-    {"creator": ".creator\
-\nUsage: Know who created this awesome userbot !!"})
 
 CMD_HELP.update({
     "repeat":
